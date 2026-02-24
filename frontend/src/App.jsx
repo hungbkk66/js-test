@@ -6,26 +6,78 @@ import storeProductsData from './test/data/storeProducts.json';
 
 function App() {
   const [selectedStore, setSelectedStore] = useState(1);
-  const [sortBy, setSortBy] = useState('Name');
+  const [sortBy, setSortBy] = useState('Name (Asc)');
+  const [selectedToppings, setSelectedToppings] = useState([]);
+  const [showFilter, setShowFilter] = useState(false);
 
   const stores = storesData.stores;
 
+  // Get all toppings
+  const getAllToppings = () => {
+    const toppingSet = new Set();
+    productsData.products.forEach((product) => {
+      product.toppings.split(',').forEach((topping) => {
+        toppingSet.add(topping.trim().toLowerCase());
+      });
+    });
+    return Array.from(toppingSet).sort();
+  };
+
+  const allToppings = getAllToppings();
+
+  // Get products and filter and sort
   const getProductsForStore = () => {
     const storeProductIds = storeProductsData.shopProducts
       .filter((sp) => sp.shop === selectedStore)
       .map((sp) => sp.product);
 
-    const storeProducts = productsData.products
+    let storeProducts = productsData.products
       .filter((p) => storeProductIds.includes(p.id))
       .map((product) => ({
-        id: `MT-${String(product.id).padStart(2, '0')}`,
+        id: `MT-0${String(product.id)}`,
         name: product.name,
         toppings: product.toppings,
-        price: `$${product.price}`,
-        isTrending: product.id === 1,
+        price: product.price,
+        priceDisplay: `$${product.price}`,
       }));
 
-    return storeProducts;
+    // Topping filter
+    if (selectedToppings.length > 0) {
+      storeProducts = storeProducts.filter((product) => {
+        const productToppings = product.toppings
+          .split(',')
+          .map((t) => t.trim().toLowerCase());
+        return selectedToppings.some((topping) =>
+          productToppings.includes(topping),
+        );
+      });
+    }
+
+    // Sort
+    const sorted = [...storeProducts].sort((a, b) => {
+      switch (sortBy) {
+        case 'Name (Asc)':
+          return a.name.localeCompare(b.name);
+        case 'Name (Dsc)':
+          return b.name.localeCompare(a.name);
+        case 'Price (Asc)':
+          return a.price - b.price;
+        case 'Price (Dsc)':
+          return b.price - a.price;
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  };
+
+  const handleToppingChange = (topping) => {
+    setSelectedToppings((prev) =>
+      prev.includes(topping)
+        ? prev.filter((t) => t !== topping)
+        : [...prev, topping],
+    );
   };
 
   return (
@@ -52,9 +104,14 @@ function App() {
           {stores.find((s) => s.id === selectedStore)?.name} Menu
         </h1>
 
-        {/* Filter and Sort Controls */}
+        {/* Filter and Sort buttons */}
         <div className="controls-bar">
-          <button className="filter-btn">Filter</button>
+          <button
+            className="filter-btn"
+            onClick={() => setShowFilter(!showFilter)}
+          >
+            Filter
+          </button>
           <div className="sort-container">
             <label htmlFor="sort">Sort By</label>
             <select
@@ -63,14 +120,38 @@ function App() {
               onChange={(e) => setSortBy(e.target.value)}
               className="sort-select"
             >
-              <option>Name</option>
-              <option>Price</option>
-              <option>Rating</option>
+              <option>Name (Asc)</option>
+              <option>Name (Dsc)</option>
+              <option>Price (Asc)</option>
+              <option>Price (Dsc)</option>
             </select>
           </div>
         </div>
 
-        {/* Products Grid */}
+        {/* Filter toppings */}
+        {showFilter && (
+          <div className="filter-panel">
+            <div className="filter-section">
+              <h3 className="filter-title">Toppings:</h3>
+              <div className="filter-checkboxes">
+                {allToppings.map((topping) => (
+                  <div key={topping} className="checkbox-group">
+                    <input
+                      type="checkbox"
+                      id={`topping-${topping}`}
+                      checked={selectedToppings.includes(topping)}
+                      onChange={() => handleToppingChange(topping)}
+                      className="checkbox-input"
+                    />
+                    <label htmlFor={`topping-${topping}`}>{topping}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Products list */}
         <div className="products-grid">
           {getProductsForStore().map((product) => (
             <div key={product.id} className="product-card">
@@ -83,10 +164,7 @@ function App() {
                 <strong>Toppings:</strong> {product.toppings}
               </div>
               <div className="product-footer">
-                {product.isTrending && (
-                  <button className="trending-badge">Trending</button>
-                )}
-                <div className="product-price">{product.price}</div>
+                <div className="product-price">{product.priceDisplay}</div>
               </div>
             </div>
           ))}
